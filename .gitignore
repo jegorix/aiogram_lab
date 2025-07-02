@@ -1,0 +1,55 @@
+# Byte-compiled / optimized / DLL files
+__pycache__/
+*.py[cod]
+*$py.class
+
+# Virtual environment
+venv/
+env/
+.venv/
+
+# Editor-specific
+.vscode/
+.idea/
+
+# OS-specific
+.DS_Store
+Thumbs.db
+
+# Logs and databases
+*.log
+*.sqlite3
+
+# Python environments
+*.env
+*.env.*
+.envrc
+
+# Pygame cache or builds (if any)
+*.swp
+*.swo
+
+# Jupyter Notebook checkpoints (если используешь)
+.ipynb_checkpoints/
+
+# PyInstaller
+*.spec
+dist/
+build/
+
+# Others
+*.bak
+*.tmp
+# Image files
+*.png
+# *.jpg
+*.jpeg
+*.gif
+*.bmp
+*.tiff
+*.webp
+# *.svg
+
+# Python compiled files
+*.pyc
+__pycache__/
