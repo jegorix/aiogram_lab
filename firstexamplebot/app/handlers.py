@@ -2,6 +2,8 @@ from aiogram.filters import CommandStart, Command
 from aiogram.types import Message
 from aiogram import F, Router
 
+import app.keyboards as kb
+
 router = Router()
 
 
@@ -9,7 +11,7 @@ router = Router()
 @router.message(CommandStart())
 async def cmd_start(message: Message):
     await message.reply(f'Hello.\nYour id = {message.from_user.id}\nUsername = {message.from_user.username}\n' \
-        f"Your name = {message.from_user.first_name}")
+        f"Your name = {message.from_user.first_name}", reply_markup=await kb.inline_cars()) # or kb.main or kb.settings
     
 #F.text usage and compare with param
 @router.message(F.text.lower() == 'как дела?')
