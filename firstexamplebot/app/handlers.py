@@ -6,7 +6,15 @@ from aiogram.fsm.context import FSMContext
 
 import app.keyboards as kb
 
+from app.middlewares import TestMiddleWare, AntiSpamMiddleware, LoggingMiddleware 
+
 router = Router()
+
+# MIDDLEWARE CONNECT
+# router.message.middleware(TestMiddleWare())
+# router.message.outer_middleware(TestMiddleWare()) # works anyway
+router.message.outer_middleware(AntiSpamMiddleware())
+router.message.middleware(LoggingMiddleware()) # works when filter catches
 
 
 class Reg(StatesGroup):

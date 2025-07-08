@@ -3,11 +3,13 @@ from config import TOKEN
 from aiogram import Bot, Dispatcher
 import logging 
 from app.handlers import router
-
-
+# from app.middlewares import LoggingMiddleware
 
 bot = Bot(token=TOKEN)
 dp = Dispatcher()
+
+
+# dp.message.middleware(LoggingMiddleware())
 
 
 async def main():
