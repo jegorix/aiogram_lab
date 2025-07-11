@@ -3,7 +3,7 @@ from aiogram.types import Message
 from aiogram.filters import CommandStart, Command
 from aiogram.fsm.state import State, StatesGroup
 from aiogram.fsm.context import FSMContext
-from app.keyboars import action_choose
+from app.keyboars import action_choose, approve_data
 from app.validators import Validators
 
 router = Router()
@@ -113,6 +113,6 @@ async def get_github_link(message: Message, state: FSMContext):
 
     Данные верны?
     """
-    await message.answer(student_text, parse_mode="HTML", reply_markup=None)
+    await message.answer(student_text, parse_mode="HTML", reply_markup=approve_data)
     await state.clear()
     
