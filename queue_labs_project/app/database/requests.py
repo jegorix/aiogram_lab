@@ -1,8 +1,9 @@
 from sqlalchemy import select, asc, desc
 from sqlalchemy.ext.asyncio import AsyncSession
 from .models import Student, async_session
-from datetime import datetime, timezone
+from datetime import datetime, timezone, timedelta
 
+MOSCOW_TZ = timezone(timedelta(hours=3))
 
 async def add_student(
     user_tg_id: int,
@@ -21,7 +22,7 @@ async def add_student(
                 lab_number=lab_number,
                 sub_group=sub_group,
                 github_link=github_link,
-                created_at = datetime.now(timezone.utc)
+                created_at = datetime.now(MOSCOW_TZ)
             )
             session.add(student)
             await session.flush()

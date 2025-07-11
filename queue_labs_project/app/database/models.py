@@ -1,7 +1,10 @@
 from sqlalchemy import BigInteger, String, Integer, DateTime
 from sqlalchemy.orm import DeclarativeBase, Mapped, mapped_column
 from sqlalchemy.ext.asyncio import AsyncAttrs, async_sessionmaker, create_async_engine
-from datetime import datetime, timezone
+from datetime import datetime, timezone, timedelta
+
+MOSCOW_TZ = timezone(timedelta(hours=3))
+
 
 engine = create_async_engine(url="sqlite+aiosqlite:///db_students.sqlite3")
 

@@ -126,8 +126,8 @@ async def approve_yes(callback: CallbackQuery, state: FSMContext):
     
     try:
         await rq.add_student(
-            user_tg_id=callback.message.from_user.id,
-            username=callback.message.from_user.username,
+            user_tg_id=callback.from_user.id,
+            username=callback.from_user.username,
             name_fio=student_data['name_fio'],
             lab_number=student_data['lab_number'],
             sub_group=student_data['sub_group'],
@@ -152,6 +152,11 @@ async def approve_yes(callback: CallbackQuery, state: FSMContext):
     
     
 
+#     from datetime import datetime
+
+# # Пример вывода в сообщении
+# create_time = student.create_at.strftime("%d.%m.%Y %H:%M")
+# await message.answer(f"Вы записались в очередь в {create_time} (МСК)")
     
 
     # await rq.add_student()
