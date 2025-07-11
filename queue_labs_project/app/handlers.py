@@ -1,17 +1,17 @@
 from aiogram import Router, F
-from aiogram.types import Message
+from aiogram.types import Message, CallbackQuery
 from aiogram.filters import CommandStart, Command
 from aiogram.fsm.state import State, StatesGroup
 from aiogram.fsm.context import FSMContext
 from app.keyboars import action_choose, approve_data
 from app.validators import Validators
-
+import app.database.requests as rq
 router = Router()
 
 # HANDLE COMMAND START
 @router.message(CommandStart())
 async def cmd_start(message: Message, state: FSMContext):
-    state.clear()
+    # state.clear()
     welcome_text = """
      <b>    Добро пожаловать в бота для очереди лаб!👋</b>
      
@@ -114,5 +114,45 @@ async def get_github_link(message: Message, state: FSMContext):
     Данные верны?
     """
     await message.answer(student_text, parse_mode="HTML", reply_markup=approve_data)
-    await state.clear()
+    
+    
+    
+    # INLINE YES APPROVEMENT -> ADD STUDENT TO THE DATABASE
+@router.callback_query(F.data == "approve_yes")
+async def approve_yes(callback: CallbackQuery, state: FSMContext):
+    
+    await callback.answer("Загрузка данных в очередь...")
+    student_data = await state.get_data()
+    
+    try:
+        await rq.add_student(
+            user_tg_id=callback.message.from_user.id,
+            username=callback.message.from_user.username,
+            name_fio=student_data['name_fio'],
+            lab_number=student_data['lab_number'],
+            sub_group=student_data['sub_group'],
+            github_link=student_data['github_link']
+        )
+
+        await callback.message.answer("Вы успешно записались в очередь!🎉\n"
+                                      "Ваше место в очереди можно посмотреть в разделе\n'Просмотр очереди👀'",
+                                      reply_markup=action_choose,
+                                      parse_mode='HTML')
+        
+    
+    except Exception as e:
+        await callback.message.answer("Произошла ошибка при сохранении данных❌\n"
+                                      "Попробуйте еще раз", reply_markup=action_choose,
+                                      parse_mode='HTML')
+        
+        print(f"\nОшибка при добавлении в БД: {e}\n")
+        
+    finally:
+        await state.clear()
+    
+    
+
+    
+
+    # await rq.add_student()
     

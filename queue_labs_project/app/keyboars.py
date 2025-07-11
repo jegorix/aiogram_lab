@@ -9,5 +9,5 @@ action_choose = ReplyKeyboardMarkup(keyboard=[
 
 
 approve_data = InlineKeyboardMarkup(inline_keyboard=[
-    [InlineKeyboardButton(text="Да", callback_data="approve_yes")],[InlineKeyboardButton(text="Нет", callback_data="approve_нет")]
+    [InlineKeyboardButton(text="Да", callback_data="approve_yes")],[InlineKeyboardButton(text="Нет", callback_data="approve_no")]
 ])
