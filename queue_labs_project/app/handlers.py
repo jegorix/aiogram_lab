@@ -3,7 +3,7 @@ from aiogram.types import Message, CallbackQuery
 from aiogram.filters import CommandStart, Command
 from aiogram.fsm.state import State, StatesGroup
 from aiogram.fsm.context import FSMContext
-from app.keyboars import action_choose, approve_data
+from app.keyboars import action_choose, approve_data, show_queue_method
 from app.validators import Validators
 import app.database.requests as rq
 router = Router()
@@ -11,7 +11,7 @@ router = Router()
 # HANDLE COMMAND START
 @router.message(CommandStart())
 async def cmd_start(message: Message, state: FSMContext):
-    # state.clear()
+    state.clear()
     welcome_text = """
      <b>    Добро пожаловать в бота для очереди лаб!👋</b>
      
@@ -121,6 +121,7 @@ async def get_github_link(message: Message, state: FSMContext):
 @router.callback_query(F.data == "approve_yes")
 async def approve_yes(callback: CallbackQuery, state: FSMContext):
     
+    await callback.message.edit_reply_markup(reply_markup=None)
     await callback.answer("Загрузка данных в очередь...")
     student_data = await state.get_data()
     
@@ -149,8 +150,54 @@ async def approve_yes(callback: CallbackQuery, state: FSMContext):
         
     finally:
         await state.clear()
+        
+        
+    
+    #INLINE NO APPROVEMENT
+@router.callback_query(F.data == "approve_no")
+async def approve_no(callback: CallbackQuery, state: FSMContext):
+    await callback.message.edit_reply_markup(reply_markup=None)
+    await callback.answer("Отмена...")
+    await state.clear()
+    await callback.message.edit_text("Процесс записи отменен!\nЧтобы начать сначала нажмите на конпку\n'Записаться в очередь🔥'")
     
     
+    
+    
+    
+    
+ # QUEUE SHOWING
+@router.message(F.text.startswith("Просмотр"))
+async def show_menu(message: Message):
+    print("\nПРОСМОТР ОБРАБОТАН\n")
+    await message.answer("Выберите способ представления очереди", reply_markup=show_queue_method)
+    print("\nПРОСМОТР ОБРАБОТАН\n")
+    
+    
+    
+    
+@router.callback_query(F.data == "quick_show")
+async def quick_show(callback: CallbackQuery):
+    callback.answer("Загрузка очереди...")
+    students = await rq.get_students_sorted(sort_by_time=True)
+    if not students:
+        await callback.message.answer("Очередь пуста!")
+        return
+    
+    responce = ["<b>Текущая очередь отсортированная по времени добавления</b>\n"]
+    
+    for idx, student in enumerate(students, start=1):
+        time_str = student.created_at.strftime("%H:%M %d.%m")
+        responce.append(
+            f"{idx}. {student.name_fio} - ({student.username})\n"
+            f"Лабораторная работа №{student.lab_number}\n"
+            f"Подгруппа-{student.sub_group}\n"
+            f"Ссылка на github:\n{student.github_link}\n"
+            f"Добавлен в {time_str}\n"
+        )
+    
+    await callback.message.answer("\n\n".join(responce), parse_mode="HTML")
+
 
 #     from datetime import datetime
 
