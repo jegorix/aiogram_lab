@@ -6,6 +6,7 @@ from aiogram.fsm.context import FSMContext
 from app.keyboars import action_choose, approve_data, show_queue_method
 from app.validators import Validators
 import app.database.requests as rq
+from app.database.models import Student
 router = Router()
 
 # HANDLE COMMAND START
@@ -29,12 +30,19 @@ async def cmd_start(message: Message, state: FSMContext):
     
     
     
-# OBLIGATORY FORM
+# OBLIGATORY REGISTER FORM 
 class RegStudent(StatesGroup):
     name_fio = State()
     lab_number = State()
     sub_group = State()
     github_link = State()
+    
+    
+# OBLIGATORY LabNumber FORM   
+class LabNumber(StatesGroup):
+    lab_number = State()
+
+
 
 
 
@@ -113,7 +121,7 @@ async def get_github_link(message: Message, state: FSMContext):
 
     Данные верны?
     """
-    await message.answer(student_text, parse_mode="HTML", reply_markup=approve_data)
+    await message.answer(student_text, parse_mode="HTML", reply_markup=approve_data, disable_web_page_preview=True)
     
     
     
@@ -138,13 +146,15 @@ async def approve_yes(callback: CallbackQuery, state: FSMContext):
         await callback.message.answer("Вы успешно записались в очередь!🎉\n"
                                       "Ваше место в очереди можно посмотреть в разделе\n'Просмотр очереди👀'",
                                       reply_markup=action_choose,
-                                      parse_mode='HTML')
+                                      parse_mode='HTML',
+                                      disable_web_page_preview=True)
         
     
     except Exception as e:
         await callback.message.answer("Произошла ошибка при сохранении данных❌\n"
                                       "Попробуйте еще раз", reply_markup=action_choose,
-                                      parse_mode='HTML')
+                                      parse_mode='HTML',
+                                      disable_web_page_preview=True)
         
         print(f"\nОшибка при добавлении в БД: {e}\n")
         
@@ -169,22 +179,16 @@ async def approve_no(callback: CallbackQuery, state: FSMContext):
  # QUEUE SHOWING
 @router.message(F.text.startswith("Просмотр"))
 async def show_menu(message: Message):
-    print("\nПРОСМОТР ОБРАБОТАН\n")
     await message.answer("Выберите способ представления очереди", reply_markup=show_queue_method)
-    print("\nПРОСМОТР ОБРАБОТАН\n")
     
     
     
+async def viewing_message(callback: CallbackQuery | Message, students: list[Student], responce: list[str]) -> list[str]:
+    await callback.answer("Загрузка очереди...")
     
-@router.callback_query(F.data == "quick_show")
-async def quick_show(callback: CallbackQuery):
-    callback.answer("Загрузка очереди...")
-    students = await rq.get_students_sorted(sort_by_time=True)
     if not students:
         await callback.message.answer("Очередь пуста!")
-        return
-    
-    responce = ["<b>Текущая очередь отсортированная по времени добавления</b>\n"]
+        return responce
     
     for idx, student in enumerate(students, start=1):
         time_str = student.created_at.strftime("%H:%M %d.%m")
@@ -196,7 +200,60 @@ async def quick_show(callback: CallbackQuery):
             f"Добавлен в {time_str}\n"
         )
     
-    await callback.message.answer("\n\n".join(responce), parse_mode="HTML")
+    return responce
+    
+    
+    
+@router.callback_query(F.data == "quick_show")
+async def quick_show(callback: CallbackQuery):
+   
+    students = await rq.get_students_sorted(sort_by_time=True)
+    
+    responce = ["<b>Текущая очередь отсортированная по времени добавления</b>\n"]
+
+    updated_responce = await viewing_message(callback, students, responce)
+    
+    if updated_responce:
+        await callback.message.answer("\n\n".join(updated_responce), parse_mode="HTML", disable_web_page_preview=True)
+
+
+
+@router.callback_query(F.data.startswith("sub_group-"))
+async def sub_group_show(callback: CallbackQuery):
+    group_number = int(callback.data.split("-")[1])
+    students = await rq.get_students_sorted(sub_group=group_number)
+    responce = [f"<b>Текущая очередь отсортированная по номеру подгруппы\n\nПодгруппа-{group_number}</b>\n"]
+    updated_responce = await viewing_message(callback, students, responce)
+    
+    if updated_responce:
+        await callback.message.answer("\n\n".join(updated_responce), parse_mode="HTML", disable_web_page_preview=True)
+
+
+@router.callback_query(F.data == "lab_number_show")
+async def lab_number_show(callback: CallbackQuery, state: FSMContext):
+    await callback.message.answer("Введите номер лабораторной работы")
+    await state.set_state(LabNumber.lab_number)
+    
+    
+@router.message(LabNumber.lab_number)
+async def get_lab_number(message: Message, state: FSMContext):
+    number = Validators.lab_number_validate(message.text)
+    if not number:
+        await message.reply("Неверный номер лабораторной работы, введите число!")
+        return
+    
+    await state.clear()
+    
+    students = await rq.get_students_sorted(lab_number=number)
+    responce = [f"<b>Текущая очередь отсортированная по номеру лабы\nЛаба №{number}</b>\n"]
+    
+    updated_responce = await viewing_message(message, students, responce)
+    
+    if updated_responce:
+        await message.answer("\n\n".join(updated_responce), parse_mode="HTML", disable_web_page_preview=True)
+    
+        
+
 
 
 #     from datetime import datetime
