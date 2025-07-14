@@ -26,3 +26,10 @@ find_student_method = InlineKeyboardMarkup(inline_keyboard=[
     [InlineKeyboardButton(text="Поиск по фамилии", callback_data="find_by-surname")]
     ]
 )
+
+delete_student_method = InlineKeyboardMarkup(inline_keyboard=[
+    [InlineKeyboardButton(text="по telegram id", callback_data="delete_by-id")],
+    [InlineKeyboardButton(text="по username", callback_data="delete_by-username")],
+    [InlineKeyboardButton(text="по фамилии", callback_data="delete_by-surname")]
+    ]
+)

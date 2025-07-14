@@ -79,3 +79,42 @@ async def get_student_id_or_username(user_tg_id: int = None, username: str = Non
         return result.scalars().all()
     
     
+    
+
+async def delete_student(
+    lab_number: int,
+    user_tg_id: int | None = None,
+    username: str | None = None,
+    surname: str | None = None,
+    delete_all: bool = False
+) -> int:
+    async with async_session() as session:
+        query = select(Student).where(Student.lab_number == lab_number)
+        
+        if user_tg_id:
+            query = query.where(Student.user_tg_id == user_tg_id)
+            
+        if surname:
+            query = query.where(Student.name_fio.startswith(surname))
+            
+        if username:
+            query = query.where(Student.username == username)
+            
+        query = query.order_by(Student.created_at.asc())
+        
+        result = await session.execute(query)
+        students = result.scalars().all()
+        
+        if not students:
+            return 0
+        
+        if not delete_all:
+            await session.delete(students[0])
+            await session.commit()
+            return 1
+        else:
+            for student in students:
+                await session.delete(student)
+                
+            await session.commit()
+            return len(students)

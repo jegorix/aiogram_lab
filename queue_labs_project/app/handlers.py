@@ -3,7 +3,7 @@ from aiogram.types import Message, CallbackQuery
 from aiogram.filters import CommandStart, Command
 from aiogram.fsm.state import State, StatesGroup
 from aiogram.fsm.context import FSMContext
-from app.keyboars import action_choose, approve_data, show_queue_method, find_student_method
+from app.keyboars import action_choose, approve_data, show_queue_method, find_student_method, delete_student_method
 from app.validators import Validators
 import app.database.requests as rq
 from app.database.models import Student
@@ -196,13 +196,13 @@ async def viewing_message(callback: CallbackQuery | Message, students: list[Stud
         return responce
     
     for idx, student in enumerate(students, start=1):
-        time_str = student.created_at.strftime("%H:%M %d.%m")
+        time_str = student.created_at.strftime('%d.%m в %H:%M')
         responce.append(
             f"{idx}. {student.name_fio} - ({student.username})\n"
             f"Лабораторная работа №{student.lab_number}\n"
             f"Подгруппа-{student.sub_group}\n"
             f"Ссылка на github:\n{student.github_link}\n"
-            f"Добавлен в {time_str}\n"
+            f"Добавлен {time_str}\n"
         )
     
     return responce
@@ -261,9 +261,10 @@ async def get_lab_number(message: Message, state: FSMContext):
     
     
     
-     # HANDLE COMMAND FINDSTUDENT
+     # HANDLE COMMAND FIND STUDENT
 @router.message(Command("find"))
-async def cmd_find_student(message: Message):
+async def cmd_find_student(message: Message, state: FSMContext):
+    await state.clear()
     await message.answer("Выберите ключевой параметр поиска студента", reply_markup=find_student_method)
 
 
@@ -273,6 +274,7 @@ async def handle_finding(callback: CallbackQuery, state: FSMContext):
     param = callback.data.split('-')[1]
     await state.update_data(search_param=param)
     
+    param = "фамилию" if param == "surname" else param
     await callback.message.answer(f"Введите {param} пользователя, которого вы хотите найти")
     await state.set_state(UserData.user_credentials)
         
@@ -318,6 +320,93 @@ async def get_user_credentials(message: Message, state: FSMContext):
 
     await state.clear()
     
+    
+    
+class HandleDelete(StatesGroup):
+    user_data = State()
+    lab = State()    
+    
+    
+    
+# DELETE STUDENT FROM QUEUE
+@router.message(F.text.startswith("Удалиться"))
+async def delete_from_queue(message: Message, state: FSMContext):
+    await state.clear()
+    await message.answer("Выберите ключевой параметр удаления", reply_markup=delete_student_method)
+    
+    
+@router.callback_query(F.data.startswith("delete_by-"))
+async def handle_deleting(callback: CallbackQuery, state: FSMContext):
+    
+    await callback.answer("Обработка запроса...")
+    param = callback.data.split('-')[1]
+    await state.update_data(search_param=param)
+    
+    param = "фамилию" if param == "surname" else param
+    await callback.message.answer(f"Введите {param} пользователя для удаления")
+    await state.set_state(HandleDelete.user_data)
+    
+    
+    
+@router.message(HandleDelete.user_data)
+async def handle_credentials(message: Message, state: FSMContext):
+    data = await state.get_data()
+    param = data["search_param"]
+    value = message.text
+
+    if param == "id":
+        id = Validators.lab_number_validate(value)
+        if not id:
+            await message.reply("Неверный формат telegram id. Попробуйте еще раз!")
+            return
+        
+        value = int(value)
+        await state.update_data(user_credentials=value)
+    
+    else:
+        await state.update_data(user_credentials=value)
+        
+    await state.set_state(HandleDelete.lab)
+    await message.answer("Введите номер лабы удаляемого пользователя")
+    
+    
+@router.message(HandleDelete.lab)
+async def get_lab_num(message: Message, state: FSMContext):
+    
+    if not Validators.lab_number_validate(message.text):
+        await message.reply("Неверный номер лабы. Попробуйте еще раз!")
+        return
+    
+    data = await state.get_data()
+    param = data["search_param"]
+    delete_user_data = data["user_credentials"]
+    lab_number = message.text
+    deleted_count = 0
+    
+    if param == "id":
+        deleted_count = await rq.delete_student(lab_number, user_tg_id=delete_user_data)
+        
+    elif param == "username":
+        deleted_count = await rq.delete_student(lab_number, username=delete_user_data)
+        
+    elif param == "surname":
+        deleted_count = await rq.delete_student(lab_number, surname=delete_user_data)
+         
+         
+    if deleted_count > 0:
+        await message.answer(f"✅ Удалено записей: {deleted_count}")
+        
+    else:
+         await message.answer("❌ Записи не найдены")
+         
+    await state.clear()
+    
+    
+
+    
+        
+        
+        
     
     
     
