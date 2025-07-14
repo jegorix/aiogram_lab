@@ -299,7 +299,12 @@ async def get_user_credentials(message: Message, state: FSMContext):
     elif param == "username":
         students = await rq.get_student_id_or_username(username=search_value)
         
+    elif param == "surname":
+        param = "фамилии"
+        students = await rq.get_student_id_or_username(surname=search_value)
+        
     if not students:
+        param = "фамилией" if param == "фамилии" else param
         await message.answer(f"Пользователь с {param}: {search_value} не найден!")
         await state.clear()
         return

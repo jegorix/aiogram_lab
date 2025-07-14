@@ -22,6 +22,7 @@ show_queue_method = InlineKeyboardMarkup(inline_keyboard=[
 
 find_student_method = InlineKeyboardMarkup(inline_keyboard=[
     [InlineKeyboardButton(text="Поиск по telegram id", callback_data="find_by-id")],
-    [InlineKeyboardButton(text="Поиск по username", callback_data="find_by-username")]
+    [InlineKeyboardButton(text="Поиск по username", callback_data="find_by-username")],
+    [InlineKeyboardButton(text="Поиск по фамилии", callback_data="find_by-surname")]
     ]
 )
