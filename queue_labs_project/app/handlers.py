@@ -3,7 +3,7 @@ from aiogram.types import Message, CallbackQuery
 from aiogram.filters import CommandStart, Command
 from aiogram.fsm.state import State, StatesGroup
 from aiogram.fsm.context import FSMContext
-from app.keyboars import action_choose, approve_data, show_queue_method
+from app.keyboars import action_choose, approve_data, show_queue_method, find_student_method
 from app.validators import Validators
 import app.database.requests as rq
 from app.database.models import Student
@@ -30,6 +30,8 @@ async def cmd_start(message: Message, state: FSMContext):
     
     
     
+    
+    
 # OBLIGATORY REGISTER FORM 
 class RegStudent(StatesGroup):
     name_fio = State()
@@ -43,8 +45,11 @@ class LabNumber(StatesGroup):
     lab_number = State()
 
 
+class UserData(StatesGroup):
+    search_param = State()
+    user_credentials = State()
 
-
+        
 
 
 
@@ -252,9 +257,68 @@ async def get_lab_number(message: Message, state: FSMContext):
     if updated_responce:
         await message.answer("\n\n".join(updated_responce), parse_mode="HTML", disable_web_page_preview=True)
     
+    
+    
+    
+    
+     # HANDLE COMMAND FINDSTUDENT
+@router.message(Command("find"))
+async def cmd_find_student(message: Message):
+    await message.answer("Выберите ключевой параметр поиска студента", reply_markup=find_student_method)
+
+
+@router.callback_query(F.data.startswith("find_by-"))
+async def handle_finding(callback: CallbackQuery, state: FSMContext):
+    await callback.answer("Обработка запроса...")
+    param = callback.data.split('-')[1]
+    await state.update_data(search_param=param)
+    
+    await callback.message.answer(f"Введите {param} пользователя, которого вы хотите найти")
+    await state.set_state(UserData.user_credentials)
         
+    
 
+@router.message(UserData.user_credentials)
+async def get_user_credentials(message: Message, state: FSMContext):
+    
+    data = await state.get_data()
+    param = data['search_param']
+    search_value = message.text
+    students = None
 
+    
+    if param == "id":
+        id = Validators.lab_number_validate(message.text)
+        if not id:
+            await message.reply("Неверный формат telegram id. Попробуйте еще раз!")
+            return
+            
+        students = await rq.get_student_id_or_username(user_tg_id=id)
+    
+    
+    elif param == "username":
+        students = await rq.get_student_id_or_username(username=search_value)
+        
+    if not students:
+        await message.answer(f"Пользователь с {param}: {search_value} не найден!")
+        await state.clear()
+        return
+        
+    responce = [f"<b>Найдено {len(students)} записей для {param}: {search_value}</b>\n\n"]
+
+    responce = await viewing_message(message, students, responce)
+    
+    if responce:
+        await message.answer("\n".join(responce), parse_mode="HTML", disable_web_page_preview=True)
+
+    await state.clear()
+    
+    
+    
+    
+    
+    
+    
 
 #     from datetime import datetime
 
