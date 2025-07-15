@@ -82,24 +82,45 @@ async def get_student_id_or_username(user_tg_id: int = None, username: str = Non
     
 
 async def delete_student(
-    lab_number: int,
+    lab_number: int | None = None,
     user_tg_id: int | None = None,
     username: str | None = None,
     surname: str | None = None,
-    delete_all: bool = False
+    delete_all: bool = False,
+    param: str | bool = False,
+    data: str | bool = False
+
 ) -> int:
     async with async_session() as session:
-        query = select(Student).where(Student.lab_number == lab_number)
+        query = select(Student)
+        
+        if data:
+            if param == "user_tg_id":
+                user_tg_id = int(data) if isinstance(data, str) and data.isdigit() else data
+                
+            elif param == "surname":
+                surname = data
+                
+            elif param == "username":
+                username = data
+        
+        
+        conditions = []
+        if lab_number:
+            conditions.append(Student.lab_number == lab_number)
         
         if user_tg_id:
-            query = query.where(Student.user_tg_id == user_tg_id)
+            conditions.append(Student.user_tg_id == user_tg_id)
             
         if surname:
-            query = query.where(Student.name_fio.startswith(surname))
+            conditions.append(Student.name_fio.startswith(surname))
             
         if username:
-            query = query.where(Student.username == username)
+            conditions.append(Student.username == username)
             
+        if conditions:
+            query = query.where(*conditions)
+        
         query = query.order_by(Student.created_at.asc())
         
         result = await session.execute(query)

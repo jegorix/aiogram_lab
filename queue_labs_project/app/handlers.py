@@ -53,7 +53,6 @@ class UserData(StatesGroup):
 
 
 
-
 # HANDLE COMMAND PUSH TO QUEUE
 @router.message(F.text.startswith("Записаться"))
 async def cmd_push(message: Message, state: FSMContext):
@@ -325,6 +324,7 @@ async def get_user_credentials(message: Message, state: FSMContext):
 class HandleDelete(StatesGroup):
     user_data = State()
     lab = State()    
+    is_delete_all = State()
     
     
     
@@ -366,8 +366,21 @@ async def handle_credentials(message: Message, state: FSMContext):
     else:
         await state.update_data(user_credentials=value)
         
+    
+    if data.get("is_delete_all", False):
+        deleted_count = await rq.delete_student(data=value, delete_all=True, param = param)
+        await state.clear()
+        await message.answer(
+        f"✅ Удалено записей: {deleted_count}" if deleted_count > 0
+        else "❌ Записи не найдены"
+        ) 
+        return 
+    
+        
     await state.set_state(HandleDelete.lab)
     await message.answer("Введите номер лабы удаляемого пользователя")
+    
+    
     
     
 @router.message(HandleDelete.lab)
@@ -381,26 +394,45 @@ async def get_lab_num(message: Message, state: FSMContext):
     param = data["search_param"]
     delete_user_data = data["user_credentials"]
     lab_number = message.text
-    deleted_count = 0
+    
+    kwargs = {
+        "lab_number": lab_number,
+        "delete_all": False
+    }
+    
     
     if param == "id":
-        deleted_count = await rq.delete_student(lab_number, user_tg_id=delete_user_data)
+       kwargs["user_tg_id"] = delete_user_data
         
     elif param == "username":
-        deleted_count = await rq.delete_student(lab_number, username=delete_user_data)
+        kwargs["username"] = delete_user_data
         
     elif param == "surname":
-        deleted_count = await rq.delete_student(lab_number, surname=delete_user_data)
-         
-         
-    if deleted_count > 0:
-        await message.answer(f"✅ Удалено записей: {deleted_count}")
+        kwargs["surname"] = delete_user_data
         
-    else:
-         await message.answer("❌ Записи не найдены")
-         
-    await state.clear()
     
+    deleted_count = await rq.delete_student(**kwargs)
+         
+    response = (
+        f"✅ Удалено записей: {deleted_count}" if deleted_count > 0
+        else "❌ Записи не найдены"
+    )     
+
+    await message.answer(response)
+    await state.clear()
+
+    
+
+# DELETE ALL RECORDS FROM USER
+
+@router.message(Command("deleteall"))
+async def cmd_delete(message: Message, state: FSMContext):
+   await state.clear()
+   await state.update_data(is_delete_all=True)
+   await message.answer("Выберите ключевой параметр удаления\n"
+                        "Эта команда удалит все записи по выбранному параметру",
+                        reply_markup=delete_student_method)
+
     
 
     
