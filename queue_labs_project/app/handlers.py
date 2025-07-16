@@ -7,11 +7,15 @@ from app.keyboars import action_choose, approve_data, show_queue_method, find_st
 from app.validators import Validators
 import app.database.requests as rq
 from app.database.models import Student
+from app.logging import log_event
+
+
 router = Router()
 
 # HANDLE COMMAND START
 @router.message(CommandStart())
 async def cmd_start(message: Message, state: FSMContext):
+    log_event(message, "/start")
     state.clear()
     welcome_text = """
      <b>    Добро пожаловать в бота для очереди лаб!👋</b>
@@ -56,6 +60,7 @@ class UserData(StatesGroup):
 # HANDLE COMMAND PUSH TO QUEUE
 @router.message(F.text.startswith("Записаться"))
 async def cmd_push(message: Message, state: FSMContext):
+    log_event(message)
     await state.set_state(RegStudent.name_fio)
     await message.answer("Хорошо, начнем процесс добавления в очередь!\nВам придется ответить на несколько вопросов")
     # можно добавить ok or no buttons
@@ -64,6 +69,7 @@ async def cmd_push(message: Message, state: FSMContext):
     
 @router.message(RegStudent.name_fio)
 async def set_fio(message: Message, state: FSMContext):
+    log_event(message)
     if not Validators.fio_validate(message.text): #validator
         await message.reply("Неверный формат ФИО, попробуйте еще раз!")
         return
@@ -74,7 +80,8 @@ async def set_fio(message: Message, state: FSMContext):
     
     
 @router.message(RegStudent.lab_number)
-async def set_lab_number(message: Message, state: FSMContext): 
+async def set_lab_number(message: Message, state: FSMContext):
+    log_event(message)
     number = Validators.lab_number_validate(message.text)
     if not number:
         await message.reply("Неверный номер лабораторной работы, введите чисто!")
@@ -87,6 +94,7 @@ async def set_lab_number(message: Message, state: FSMContext):
     
 @router.message(RegStudent.sub_group)
 async def set_subgroup(message: Message, state: FSMContext):
+    log_event(message)
     sub_group_number = Validators.sub_group_validate(message.text)
     
     if not sub_group_number:
@@ -101,6 +109,7 @@ async def set_subgroup(message: Message, state: FSMContext):
     
 @router.message(RegStudent.github_link)
 async def get_github_link(message: Message, state: FSMContext):
+    log_event(message)
     github_link = Validators.github_link_validate(message.text)
     if not github_link:
         await message.reply("Неверный формат ссылки, проверьте ее корректность")
@@ -132,7 +141,7 @@ async def get_github_link(message: Message, state: FSMContext):
     # INLINE YES APPROVEMENT -> ADD STUDENT TO THE DATABASE
 @router.callback_query(F.data == "approve_yes")
 async def approve_yes(callback: CallbackQuery, state: FSMContext):
-    
+    log_event(callback, "approve_yes")
     await callback.message.edit_reply_markup(reply_markup=None)
     await callback.answer("Загрузка данных в очередь...")
     student_data = await state.get_data()
@@ -170,6 +179,7 @@ async def approve_yes(callback: CallbackQuery, state: FSMContext):
     #INLINE NO APPROVEMENT
 @router.callback_query(F.data == "approve_no")
 async def approve_no(callback: CallbackQuery, state: FSMContext):
+    log_event(callback,"approve_no")
     await callback.message.edit_reply_markup(reply_markup=None)
     await callback.answer("Отмена...")
     await state.clear()
@@ -183,13 +193,14 @@ async def approve_no(callback: CallbackQuery, state: FSMContext):
  # QUEUE SHOWING
 @router.message(F.text.startswith("Просмотр"))
 async def show_menu(message: Message):
+    log_event(message)
     await message.answer("Выберите способ представления очереди", reply_markup=show_queue_method)
     
     
     
 async def viewing_message(callback: CallbackQuery | Message, students: list[Student], responce: list[str]) -> list[str]:
     await callback.answer("Загрузка очереди...")
-    
+    log_event(callback)
     if not students:
         await callback.message.answer("Очередь пуста!")
         return responce
@@ -210,7 +221,7 @@ async def viewing_message(callback: CallbackQuery | Message, students: list[Stud
     
 @router.callback_query(F.data == "quick_show")
 async def quick_show(callback: CallbackQuery):
-   
+    log_event(callback)
     students = await rq.get_students_sorted(sort_by_time=True)
     
     responce = ["<b>Текущая очередь отсортированная по времени добавления</b>\n"]
@@ -224,6 +235,7 @@ async def quick_show(callback: CallbackQuery):
 
 @router.callback_query(F.data.startswith("sub_group-"))
 async def sub_group_show(callback: CallbackQuery):
+    log_event(callback)
     group_number = int(callback.data.split("-")[1])
     students = await rq.get_students_sorted(sub_group=group_number)
     responce = [f"<b>Текущая очередь отсортированная по номеру подгруппы\n\nПодгруппа-{group_number}</b>\n"]
@@ -235,12 +247,14 @@ async def sub_group_show(callback: CallbackQuery):
 
 @router.callback_query(F.data == "lab_number_show")
 async def lab_number_show(callback: CallbackQuery, state: FSMContext):
+    log_event(callback)
     await callback.message.answer("Введите номер лабораторной работы")
     await state.set_state(LabNumber.lab_number)
     
     
 @router.message(LabNumber.lab_number)
 async def get_lab_number(message: Message, state: FSMContext):
+    log_event(message)
     number = Validators.lab_number_validate(message.text)
     if not number:
         await message.reply("Неверный номер лабораторной работы, введите число!")
@@ -263,12 +277,14 @@ async def get_lab_number(message: Message, state: FSMContext):
      # HANDLE COMMAND FIND STUDENT
 @router.message(Command("find"))
 async def cmd_find_student(message: Message, state: FSMContext):
+    log_event(message, "/find")
     await state.clear()
     await message.answer("Выберите ключевой параметр поиска студента", reply_markup=find_student_method)
 
 
 @router.callback_query(F.data.startswith("find_by-"))
 async def handle_finding(callback: CallbackQuery, state: FSMContext):
+    log_event(callback)
     await callback.answer("Обработка запроса...")
     param = callback.data.split('-')[1]
     await state.update_data(search_param=param)
@@ -281,7 +297,7 @@ async def handle_finding(callback: CallbackQuery, state: FSMContext):
 
 @router.message(UserData.user_credentials)
 async def get_user_credentials(message: Message, state: FSMContext):
-    
+    log_event(message)
     data = await state.get_data()
     param = data['search_param']
     search_value = message.text
@@ -331,13 +347,14 @@ class HandleDelete(StatesGroup):
 # DELETE STUDENT FROM QUEUE
 @router.message(F.text.startswith("Удалиться"))
 async def delete_from_queue(message: Message, state: FSMContext):
+    log_event(message)
     await state.clear()
     await message.answer("Выберите ключевой параметр удаления", reply_markup=delete_student_method)
     
     
 @router.callback_query(F.data.startswith("delete_by-"))
 async def handle_deleting(callback: CallbackQuery, state: FSMContext):
-    
+    log_event(callback)
     await callback.answer("Обработка запроса...")
     param = callback.data.split('-')[1]
     await state.update_data(search_param=param)
@@ -350,6 +367,7 @@ async def handle_deleting(callback: CallbackQuery, state: FSMContext):
     
 @router.message(HandleDelete.user_data)
 async def handle_credentials(message: Message, state: FSMContext):
+    log_event(message)
     data = await state.get_data()
     param = data["search_param"]
     value = message.text
@@ -385,7 +403,7 @@ async def handle_credentials(message: Message, state: FSMContext):
     
 @router.message(HandleDelete.lab)
 async def get_lab_num(message: Message, state: FSMContext):
-    
+    log_event(message)
     if not Validators.lab_number_validate(message.text):
         await message.reply("Неверный номер лабы. Попробуйте еще раз!")
         return
@@ -397,7 +415,6 @@ async def get_lab_num(message: Message, state: FSMContext):
     
     kwargs = {
         "lab_number": lab_number,
-        "delete_all": False
     }
     
     
@@ -411,7 +428,21 @@ async def get_lab_num(message: Message, state: FSMContext):
         kwargs["surname"] = delete_user_data
         
     
-    deleted_count = await rq.delete_student(**kwargs)
+   
+    
+    
+    students = await rq.get_student_id_or_username(**kwargs)
+    responce = [f"<b>Удалено {len(students)} записей для {param}: {delete_user_data}\nЛаба №{lab_number}</b>\n\n"]
+    responce = await viewing_message(message, students, responce)
+    
+    if responce:
+        await message.answer("\n".join(responce), parse_mode="HTML", disable_web_page_preview=True)
+        
+        
+    
+    deleted_count = await rq.delete_student(**kwargs)   
+         
+         
          
     response = (
         f"✅ Удалено записей: {deleted_count}" if deleted_count > 0
@@ -424,9 +455,9 @@ async def get_lab_num(message: Message, state: FSMContext):
     
 
 # DELETE ALL RECORDS FROM USER
-
-@router.message(Command("deleteall"))
+@router.message(Command("delete"))
 async def cmd_delete(message: Message, state: FSMContext):
+   log_event(message, "/delete")
    await state.clear()
    await state.update_data(is_delete_all=True)
    await message.answer("Выберите ключевой параметр удаления\n"

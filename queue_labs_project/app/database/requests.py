@@ -60,7 +60,7 @@ async def get_students_sorted(
     
     
     
-async def get_student_id_or_username(user_tg_id: int = None, username: str = None, surname: str = None) -> Student | None:
+async def get_student_id_or_username(user_tg_id: int = None, username: str = None, surname: str = None, lab_number = None) -> Student | None:
     async with async_session() as session:
         if user_tg_id:
             result = await session.execute(
@@ -74,6 +74,11 @@ async def get_student_id_or_username(user_tg_id: int = None, username: str = Non
         elif surname:
             result = await session.execute(
                 select(Student).where(Student.name_fio.startswith(surname.capitalize()))
+            )
+        
+        elif lab_number:
+            result = await session.execute(
+                select(Student).where(Student.lab_number == lab_number)
             )
             
         return result.scalars().all()
