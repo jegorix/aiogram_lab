@@ -62,26 +62,29 @@ async def get_students_sorted(
     
 async def get_student_id_or_username(user_tg_id: int = None, username: str = None, surname: str = None, lab_number = None) -> Student | None:
     async with async_session() as session:
+        
+        query = select(Student)
+        
+        conditions = []
         if user_tg_id:
-            result = await session.execute(
-                select(Student).where(Student.user_tg_id == user_tg_id)
-            )
+            conditions.append(Student.user_tg_id == user_tg_id)
+
         elif username:
-            result = await session.execute(
-                select(Student).where(Student.username == username)
-            )
+            conditions.append(Student.username == username)
             
         elif surname:
-            result = await session.execute(
-                select(Student).where(Student.name_fio.startswith(surname.capitalize()))
-            )
+            conditions.append(Student.name_fio.startswith(surname.capitalize()))
         
         elif lab_number:
-            result = await session.execute(
-                select(Student).where(Student.lab_number == lab_number)
-            )
+            conditions.append(Student.lab_number == lab_number)
             
+        if conditions:
+            query = query.where(*conditions)
+            
+        result = await session.execute(query)
         return result.scalars().all()
+    
+        # FIX OUTPUT IN DELETING, SHOULD USE CONDITIONS LIST
     
     
     

@@ -8,6 +8,7 @@ from app.validators import Validators
 import app.database.requests as rq
 from app.database.models import Student
 from app.logging import log_event
+from config import ADMINS
 
 
 router = Router()
@@ -141,7 +142,7 @@ async def get_github_link(message: Message, state: FSMContext):
     # INLINE YES APPROVEMENT -> ADD STUDENT TO THE DATABASE
 @router.callback_query(F.data == "approve_yes")
 async def approve_yes(callback: CallbackQuery, state: FSMContext):
-    log_event(callback, "approve_yes")
+    log_event(callback, "В очередь добавлен новый пользователь")
     await callback.message.edit_reply_markup(reply_markup=None)
     await callback.answer("Загрузка данных в очередь...")
     student_data = await state.get_data()
@@ -348,7 +349,16 @@ class HandleDelete(StatesGroup):
 @router.message(F.text.startswith("Удалиться"))
 async def delete_from_queue(message: Message, state: FSMContext):
     log_event(message)
+    
+    current_user = await rq.get_student_id_or_username(user_tg_id=message.from_user.id)
+    if not current_user:
+        await message.answer("❌ Ваших записей нет в очереди!\nУ вас нет права удалять пользователей")
+        await state.clear()
+        return
+    
     await state.clear()
+    await state.update_data(current_user_id=current_user[0].user_tg_id)
+    
     await message.answer("Выберите ключевой параметр удаления", reply_markup=delete_student_method)
     
     
@@ -371,11 +381,17 @@ async def handle_credentials(message: Message, state: FSMContext):
     data = await state.get_data()
     param = data["search_param"]
     value = message.text
+    current_user_id = data.get("current_user_id")
 
     if param == "id":
         id = Validators.lab_number_validate(value)
         if not id:
             await message.reply("Неверный формат telegram id. Попробуйте еще раз!")
+            return
+        
+        if int(value) != current_user_id:
+            await message.answer("❌ Ваших записей нет в очереди!\nУ вас нет права удалять пользователей")
+            await state.clear()
             return
         
         value = int(value)
@@ -386,10 +402,24 @@ async def handle_credentials(message: Message, state: FSMContext):
         
     
     if data.get("is_delete_all", False):
-        deleted_count = await rq.delete_student(data=value, delete_all=True, param = param)
+        
+        students = await rq.get_student_id_or_username(**{param: value})
+        
+        if not students:
+            await message.answer("❌ Записи не найдены")
+            await state.clear()
+            return
+        
+        if any(s.user_tg_id != current_user_id for s in students):
+            await message.answer("❌ Ваших записей нет в очереди!\nУ вас нет права удалять пользователей")
+            await state.clear()
+            return
+        
+        deleted_count = await rq.delete_student(data=value, delete_all=True, param=param)
+        log_event(message, f"Удалено {deleted_count} записей из очереди")
         await state.clear()
         await message.answer(
-        f"✅ Удалено записей: {deleted_count}" if deleted_count > 0
+        f"✅ Удалено записей: {deleted_count} по параметру {param}: {value}" if deleted_count > 0
         else "❌ Записи не найдены"
         ) 
         return 
@@ -413,6 +443,12 @@ async def get_lab_num(message: Message, state: FSMContext):
     delete_user_data = data["user_credentials"]
     lab_number = message.text
     
+    
+    current_user: list[Student] = await rq.get_student_id_or_username(user_tg_id=message.from_user.id)
+    
+    current_user_id: int | str = current_user[0].user_tg_id
+    
+    
     kwargs = {
         "lab_number": lab_number,
     }
@@ -432,8 +468,16 @@ async def get_lab_num(message: Message, state: FSMContext):
     
     
     students = await rq.get_student_id_or_username(**kwargs)
+    
+    if not students or any(student.user_tg_id != current_user_id for student in students):
+        await message.answer("❌ Вы можете удалять только свои собственные записи")
+        await state.clear()
+        return
+    
     responce = [f"<b>Удалено {len(students)} записей для {param}: {delete_user_data}\nЛаба №{lab_number}</b>\n\n"]
     responce = await viewing_message(message, students, responce)
+    
+    log_event(message, "Из очереди удален пользователь")
     
     if responce:
         await message.answer("\n".join(responce), parse_mode="HTML", disable_web_page_preview=True)
@@ -458,6 +502,14 @@ async def get_lab_num(message: Message, state: FSMContext):
 @router.message(Command("delete"))
 async def cmd_delete(message: Message, state: FSMContext):
    log_event(message, "/delete")
+   
+   current_user = await rq.get_student_id_or_username(user_tg_id=message.from_user.id)
+   if not current_user:
+        await message.answer("❌ Ваших записей нет в очереди!\nУ вас нет права удалять пользователей")
+        await state.clear()
+        return
+       
+   
    await state.clear()
    await state.update_data(is_delete_all=True)
    await message.answer("Выберите ключевой параметр удаления\n"
