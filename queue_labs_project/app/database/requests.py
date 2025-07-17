@@ -1,4 +1,4 @@
-from sqlalchemy import select, asc, desc
+from sqlalchemy import select, asc, desc, delete
 from sqlalchemy.ext.asyncio import AsyncSession
 from .models import Student, async_session
 from datetime import datetime, timezone, timedelta
@@ -147,3 +147,15 @@ async def delete_student(
                 
             await session.commit()
             return len(students)
+        
+        
+async def delete_students_by_id(user_ids: list[int], lab_number: int) -> int:
+    async with async_session() as session:
+        result = await session.execute(
+            delete(Student).where(
+                Student.user_tg_id.in_(user_ids),
+                Student.lab_number == lab_number
+            )
+        )
+        await session.commit()
+        return result.rowcount

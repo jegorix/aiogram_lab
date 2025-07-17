@@ -471,8 +471,10 @@ async def get_lab_num(message: Message, state: FSMContext):
     
     
     students = await rq.get_student_id_or_username(**kwargs)
+    
     if not is_admin:
-        if not students or any(student.user_tg_id != current_user_id for student in students):
+        students = [student for student in students if student.user_tg_id == current_user_id]
+        if not students:
             await message.answer("❌ Вы можете удалять только свои собственные записи")
             await state.clear()
             return
@@ -487,8 +489,18 @@ async def get_lab_num(message: Message, state: FSMContext):
         
         
     
-    deleted_count = await rq.delete_student(**kwargs)   
-         
+    
+    
+    if students:
+        if param in ["id", "username"]:
+            deleted_count = await rq.delete_student(**kwargs)
+        else:
+            deleted_count = await rq.delete_students_by_id(
+                [s.user_tg_id for s in students],
+                lab_number
+            )
+    else:
+        deleted_count = 0
          
          
     response = (
@@ -609,6 +621,7 @@ async def admins_approve(message: Message):
 # заметил баг, если записан студент с такой же фамилией, но другим юзером, то твой дубликат тебе удалить не получится
 # также добавить возможность добавления админа не в локальную область а в config как-то
 # добавить кнопки с удалением админов, добавить о них больше информации
+# также баг при удалении, если не совпал номер лабы, то сообщение об удалении все равно пишется
 
 
 #     from datetime import datetime
