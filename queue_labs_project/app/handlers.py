@@ -457,17 +457,18 @@ async def get_lab_num(message: Message, state: FSMContext):
     
     kwargs = {
         "lab_number": lab_number,
+        param: delete_user_data
     }
     
     
-    if param == "id":
-       kwargs["user_tg_id"] = delete_user_data
+    # if param == "id":
+    #    kwargs["user_tg_id"] = delete_user_data
         
-    elif param == "username":
-        kwargs["username"] = delete_user_data
+    # elif param == "username":
+    #     kwargs["username"] = delete_user_data
         
-    elif param == "surname":
-        kwargs["surname"] = delete_user_data
+    # elif param == "surname":
+    #     kwargs["surname"] = delete_user_data
         
     
    
@@ -481,8 +482,14 @@ async def get_lab_num(message: Message, state: FSMContext):
             await message.answer("❌ Вы можете удалять только свои собственные записи")
             await state.clear()
             return
+        
+    if not students:
+       await message.answer("❌ Записи не найдены")
+       await state.clear()
+       return
+        
     
-    responce = [f"<b>Удалено {len(students)} записей для {param}: {delete_user_data}\nЛаба №{lab_number}</b>\n\n"]
+    responce = [f"<b>Найдено {len(students)} записей для {param}: {delete_user_data}\nЛаба №{lab_number}</b>\n\n"]
     responce = await viewing_message(message, students, responce)
     
     log_event(message, "Из очереди удален пользователь")
@@ -641,7 +648,6 @@ async def admins_approve(message: Message):
     
     
     
-# также добавить возможность добавления админа не в локальную область а в config как-то
 # добавить кнопки с удалением админов, добавить о них больше информации
 # также баг при удалении, если не совпал номер лабы, то сообщение об удалении все равно пишется
 
