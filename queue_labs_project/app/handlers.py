@@ -8,8 +8,10 @@ from app.validators import Validators
 import app.database.requests as rq
 from app.database.models import Student
 from app.logging import log_event
-from config import ADMINS
+from app.locals.memory import load_admins, save_admins
+# from config import ADMINS as admin_1
 
+ADMINS = load_admins()
 
 router = Router()
 
@@ -547,6 +549,7 @@ class AddAdmin(StatesGroup):
     # ADMIN ADD AND REMOVE LOGIC
 @router.message(Command("add_admin"))
 async def add_admin(message: Message, state: FSMContext):
+    log_event(message)
     is_admin = message.from_user.id
     
     if is_admin not in ADMINS:
@@ -559,6 +562,7 @@ async def add_admin(message: Message, state: FSMContext):
     
 @router.message(AddAdmin.admin_set)
 async def admin_set(message: Message, state: FSMContext):
+    log_event(message)
     new_admin_id = Validators.lab_number_validate(message.text)
     
     if not new_admin_id:
@@ -566,12 +570,15 @@ async def admin_set(message: Message, state: FSMContext):
         return
         
     ADMINS.add(new_admin_id)
+    save_admins(ADMINS)
+    log_event(message, "ДОБАВЛЕН НОВЫЙ АДМИН")
     await message.answer(f"✅ Пользователь {new_admin_id} добавлен в админы!")
     await state.clear()
     
         
 @router.message(Command("remove_admin"))
 async def remove_admin(message: Message, state: FSMContext):
+    log_event(message)
     is_admin = message.from_user.id
     
     if is_admin not in ADMINS:
@@ -584,6 +591,7 @@ async def remove_admin(message: Message, state: FSMContext):
     
 @router.message(AddAdmin.admin_reset)
 async def admin_reset(message: Message, state: FSMContext):
+    log_event(message)
     rm_admin_id = Validators.lab_number_validate(message.text)
     
     if not rm_admin_id:
@@ -594,12 +602,15 @@ async def admin_reset(message: Message, state: FSMContext):
         await message.reply("❌ Данный пользователь не является админом!")
    
     ADMINS.remove(rm_admin_id)
+    save_admins(ADMINS)
+    log_event(message, "УДАЛЕН АДМИН")
     await message.answer(f"✅ Пользователь {rm_admin_id} удалён из админов.")
     await state.clear()
     
     
 @router.message(Command("admins"))
 async def show_admins(message: Message):
+    log_event(message)
     if not ADMINS:
         await message.answer("Список админов пуст.")
         return
@@ -610,6 +621,7 @@ async def show_admins(message: Message):
     
 @router.message(Command("admin"))
 async def admins_approve(message: Message):
+    log_event(message)
     if int(message.from_user.id) in ADMINS:
         await message.answer("✅ Вы являетесь админом!")
         return
@@ -618,7 +630,6 @@ async def admins_approve(message: Message):
     
     
     
-# заметил баг, если записан студент с такой же фамилией, но другим юзером, то твой дубликат тебе удалить не получится
 # также добавить возможность добавления админа не в локальную область а в config как-то
 # добавить кнопки с удалением админов, добавить о них больше информации
 # также баг при удалении, если не совпал номер лабы, то сообщение об удалении все равно пишется
