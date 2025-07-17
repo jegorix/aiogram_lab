@@ -1,4 +1,4 @@
-from aiogram import Router, F
+from aiogram import Router, F, Bot
 from aiogram.types import Message, CallbackQuery
 from aiogram.filters import CommandStart, Command
 from aiogram.fsm.state import State, StatesGroup
@@ -9,6 +9,7 @@ import app.database.requests as rq
 from app.database.models import Student
 from app.logging import log_event
 from app.locals.memory import load_admins, save_admins
+from app.auxiliary import get_user_info
 # from config import ADMINS as admin_1
 
 ADMINS = load_admins()
@@ -609,13 +610,23 @@ async def admin_reset(message: Message, state: FSMContext):
     
     
 @router.message(Command("admins"))
-async def show_admins(message: Message):
+async def show_admins(message: Message, bot: Bot):
     log_event(message)
     if not ADMINS:
         await message.answer("Список админов пуст.")
         return
     
-    admins_list = "\n".join(f"• {admin_id}" for admin_id in ADMINS)
+    # admins_list = "\n".join(f"• {admin_id}" for admin_id in ADMINS)
+    admins_info = await get_user_info(bot, list(ADMINS))
+    if not admins_info:
+        await message.answer("Не удалось получить информацию об админах.")
+        return
+    
+    admins_list = "\n".join(
+        f"• {firstname} (@{username}) - id: {user_id}" if username else f"• {firstname} - id: {user_id}"
+        for user_id, firstname, username in admins_info
+        )
+    
     await message.answer(f"📌 Админы:\n{admins_list}")
     
     
