@@ -342,6 +342,7 @@ class HandleDelete(StatesGroup):
     user_data = State()
     lab = State()    
     is_delete_all = State()
+    is_admin = State()
     
     
     
@@ -443,6 +444,8 @@ async def get_lab_num(message: Message, state: FSMContext):
     delete_user_data = data["user_credentials"]
     lab_number = message.text
     
+    is_admin = message.from_user.id in ADMINS
+    
     
     current_user: list[Student] = await rq.get_student_id_or_username(user_tg_id=message.from_user.id)
     
@@ -468,11 +471,11 @@ async def get_lab_num(message: Message, state: FSMContext):
     
     
     students = await rq.get_student_id_or_username(**kwargs)
-    
-    if not students or any(student.user_tg_id != current_user_id for student in students):
-        await message.answer("❌ Вы можете удалять только свои собственные записи")
-        await state.clear()
-        return
+    if not is_admin:
+        if not students or any(student.user_tg_id != current_user_id for student in students):
+            await message.answer("❌ Вы можете удалять только свои собственные записи")
+            await state.clear()
+            return
     
     responce = [f"<b>Удалено {len(students)} записей для {param}: {delete_user_data}\nЛаба №{lab_number}</b>\n\n"]
     responce = await viewing_message(message, students, responce)
@@ -503,6 +506,8 @@ async def get_lab_num(message: Message, state: FSMContext):
 async def cmd_delete(message: Message, state: FSMContext):
    log_event(message, "/delete")
    
+   is_admin = message.from_user.id in ADMINS
+   
    current_user = await rq.get_student_id_or_username(user_tg_id=message.from_user.id)
    if not current_user:
         await message.answer("❌ Ваших записей нет в очереди!\nУ вас нет права удалять пользователей")
@@ -511,23 +516,100 @@ async def cmd_delete(message: Message, state: FSMContext):
        
    
    await state.clear()
-   await state.update_data(is_delete_all=True)
-   await message.answer("Выберите ключевой параметр удаления\n"
-                        "Эта команда удалит все записи по выбранному параметру",
-                        reply_markup=delete_student_method)
+   await state.update_data(is_delete_all=True,
+                           is_admin=is_admin)
+   
+   text = (
+        "Выберите параметр для удаления ВСЕХ записей\n"
+        "⚠️ Вы администратор!" if is_admin else
+        "Вы можете удалять только свои записи"
+    )
+   
+   await message.answer(text, reply_markup=delete_student_method)
 
+class AddAdmin(StatesGroup):
+    admin_set = State()
+    admin_reset = State()
     
+    
+    # ADMIN ADD AND REMOVE LOGIC
+@router.message(Command("add_admin"))
+async def add_admin(message: Message, state: FSMContext):
+    is_admin = message.from_user.id
+    
+    if is_admin not in ADMINS:
+        await message.answer("❌ У вас недостаточно прав для данной операции")
+        return
+    
+    await message.answer("Введите ID пользователя, которого вы хотите сделать админом")
+    await state.set_state(AddAdmin.admin_set)
+    
+    
+@router.message(AddAdmin.admin_set)
+async def admin_set(message: Message, state: FSMContext):
+    new_admin_id = Validators.lab_number_validate(message.text)
+    
+    if not new_admin_id:
+        await message.relpy("Неверный формат ID!\nПопробуйте еще раз")
+        return
+        
+    ADMINS.add(new_admin_id)
+    await message.answer(f"✅ Пользователь {new_admin_id} добавлен в админы!")
+    await state.clear()
+    
+        
+@router.message(Command("remove_admin"))
+async def remove_admin(message: Message, state: FSMContext):
+    is_admin = message.from_user.id
+    
+    if is_admin not in ADMINS:
+        await message.answer("❌ У вас недостаточно прав для данной операции")
+        return
+    
+    await message.answer("Введите ID пользователя, которого вы хотите лишить права быть админом")
+    await state.set_state(AddAdmin.admin_reset)
+    
+    
+@router.message(AddAdmin.admin_reset)
+async def admin_reset(message: Message, state: FSMContext):
+    rm_admin_id = Validators.lab_number_validate(message.text)
+    
+    if not rm_admin_id:
+       await message.relpy("Неверный формат ID!\nПопробуйте еще раз")
+       return
+   
+    if rm_admin_id not in ADMINS:
+        await message.reply("❌ Данный пользователь не является админом!")
+   
+    ADMINS.remove(rm_admin_id)
+    await message.answer(f"✅ Пользователь {rm_admin_id} удалён из админов.")
+    await state.clear()
+    
+    
+@router.message(Command("admins"))
+async def show_admins(message: Message):
+    if not ADMINS:
+        await message.answer("Список админов пуст.")
+        return
+    
+    admins_list = "\n".join(f"• {admin_id}" for admin_id in ADMINS)
+    await message.answer(f"📌 Админы:\n{admins_list}")
+    
+    
+@router.message(Command("admin"))
+async def admins_approve(message: Message):
+    if int(message.from_user.id) in ADMINS:
+        await message.answer("✅ Вы являетесь админом!")
+        return
+    await message.answer("❌ Вы не являетесь админом!")
+    
+    
+    
+    
+# заметил баг, если записан студент с такой же фамилией, но другим юзером, то твой дубликат тебе удалить не получится
+# также добавить возможность добавления админа не в локальную область а в config как-то
+# добавить кнопки с удалением админов, добавить о них больше информации
 
-    
-        
-        
-        
-    
-    
-    
-    
-    
-    
 
 #     from datetime import datetime
 
