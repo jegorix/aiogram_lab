@@ -1,6 +1,13 @@
 from aiogram.types import (ReplyKeyboardMarkup, KeyboardButton,
                            InlineKeyboardMarkup, InlineKeyboardButton)
 
+from aiogram.utils.keyboard import InlineKeyboardBuilder
+from app.locals.memory import load_admins
+from app.auxiliary import get_user_info
+from aiogram import Bot
+
+ADMINS = load_admins()
+
 action_choose = ReplyKeyboardMarkup(keyboard=[
    [KeyboardButton(text="Записаться в очередь🔥")],
    [KeyboardButton(text="Просмотр очереди👀")],
@@ -33,3 +40,15 @@ delete_student_method = InlineKeyboardMarkup(inline_keyboard=[
     [InlineKeyboardButton(text="по фамилии", callback_data="delete_by-surname")]
     ]
 )
+
+
+async def inline_admins(bot: Bot):
+    keyboard = InlineKeyboardBuilder()
+    admins_info = await get_user_info(bot, list(ADMINS))
+    
+    for user_id, firstname, username in admins_info:
+        keyboard.add(InlineKeyboardButton(text=f"{firstname}({username})" if firstname else user_id if username else user_id,
+                                          callback_data=f"userid_{user_id}"))
+        
+    keyboard.adjust(1)
+    return keyboard.as_markup()

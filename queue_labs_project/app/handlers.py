@@ -3,7 +3,7 @@ from aiogram.types import Message, CallbackQuery
 from aiogram.filters import CommandStart, Command
 from aiogram.fsm.state import State, StatesGroup
 from aiogram.fsm.context import FSMContext
-from app.keyboars import action_choose, approve_data, show_queue_method, find_student_method, delete_student_method
+import app.keyboars as kb 
 from app.validators import Validators
 import app.database.requests as rq
 from app.database.models import Student
@@ -34,7 +34,7 @@ async def cmd_start(message: Message, state: FSMContext):
 
     Первый записавшийся сдаёт первым!🤓
     """
-    await message.answer(welcome_text, parse_mode="HTML", reply_markup=action_choose)
+    await message.answer(welcome_text, parse_mode="HTML", reply_markup=kb.action_choose)
     
     
     
@@ -138,7 +138,7 @@ async def get_github_link(message: Message, state: FSMContext):
 
     Данные верны?
     """
-    await message.answer(student_text, parse_mode="HTML", reply_markup=approve_data, disable_web_page_preview=True)
+    await message.answer(student_text, parse_mode="HTML", reply_markup=kb.approve_data, disable_web_page_preview=True)
     
     
     
@@ -162,14 +162,14 @@ async def approve_yes(callback: CallbackQuery, state: FSMContext):
 
         await callback.message.answer("Вы успешно записались в очередь!🎉\n"
                                       "Ваше место в очереди можно посмотреть в разделе\n'Просмотр очереди👀'",
-                                      reply_markup=action_choose,
+                                      reply_markup=kb.action_choose,
                                       parse_mode='HTML',
                                       disable_web_page_preview=True)
         
     
     except Exception as e:
         await callback.message.answer("Произошла ошибка при сохранении данных❌\n"
-                                      "Попробуйте еще раз", reply_markup=action_choose,
+                                      "Попробуйте еще раз", reply_markup=kb.action_choose,
                                       parse_mode='HTML',
                                       disable_web_page_preview=True)
         
@@ -198,7 +198,7 @@ async def approve_no(callback: CallbackQuery, state: FSMContext):
 @router.message(F.text.startswith("Просмотр"))
 async def show_menu(message: Message):
     log_event(message)
-    await message.answer("Выберите способ представления очереди", reply_markup=show_queue_method)
+    await message.answer("Выберите способ представления очереди", reply_markup=kb.show_queue_method)
     
     
     
@@ -283,7 +283,7 @@ async def get_lab_number(message: Message, state: FSMContext):
 async def cmd_find_student(message: Message, state: FSMContext):
     log_event(message, "/find")
     await state.clear()
-    await message.answer("Выберите ключевой параметр поиска студента", reply_markup=find_student_method)
+    await message.answer("Выберите ключевой параметр поиска студента", reply_markup=kb.find_student_method)
 
 
 @router.callback_query(F.data.startswith("find_by-"))
@@ -363,7 +363,7 @@ async def delete_from_queue(message: Message, state: FSMContext):
     await state.clear()
     await state.update_data(current_user_id=current_user[0].user_tg_id)
     
-    await message.answer("Выберите ключевой параметр удаления", reply_markup=delete_student_method)
+    await message.answer("Выберите ключевой параметр удаления", reply_markup=kb.delete_student_method)
     
     
 @router.callback_query(F.data.startswith("delete_by-"))
@@ -520,6 +520,7 @@ async def get_lab_num(message: Message, state: FSMContext):
 
     await message.answer(response)
     await state.clear()
+    
 
     
 
@@ -547,7 +548,7 @@ async def cmd_delete(message: Message, state: FSMContext):
         "Вы можете удалять только свои записи"
     )
    
-   await message.answer(text, reply_markup=delete_student_method)
+   await message.answer(text, reply_markup=kb.delete_student_method)
 
 class AddAdmin(StatesGroup):
     admin_set = State()
@@ -569,7 +570,7 @@ async def add_admin(message: Message, state: FSMContext):
     
     
 @router.message(AddAdmin.admin_set)
-async def admin_set(message: Message, state: FSMContext):
+async def admin_set(message: Message, state: FSMContext, bot: Bot):
     log_event(message)
     new_admin_id = Validators.lab_number_validate(message.text)
     
@@ -580,12 +581,17 @@ async def admin_set(message: Message, state: FSMContext):
     ADMINS.add(new_admin_id)
     save_admins(ADMINS)
     log_event(message, "ДОБАВЛЕН НОВЫЙ АДМИН")
-    await message.answer(f"✅ Пользователь {new_admin_id} добавлен в админы!")
+    user_info = await get_user_info(bot, [new_admin_id])
+    user_id, name, username = user_info[0]
+    await message.answer(f"✅ Пользователь {name if name else new_admin_id}({username if username else new_admin_id}) добавлен в админы!")
     await state.clear()
     
         
+        
+        
+        #DELETE ADMIN
 @router.message(Command("remove_admin"))
-async def remove_admin(message: Message, state: FSMContext):
+async def remove_admin(message: Message, bot: Bot):
     log_event(message)
     is_admin = message.from_user.id
     
@@ -593,27 +599,29 @@ async def remove_admin(message: Message, state: FSMContext):
         await message.answer("❌ У вас недостаточно прав для данной операции")
         return
     
-    await message.answer("Введите ID пользователя, которого вы хотите лишить права быть админом")
-    await state.set_state(AddAdmin.admin_reset)
+    await message.answer("Выберите пользователя, которого вы хотите лишить права быть админом", reply_markup=await kb.inline_admins(bot))
     
-    
-@router.message(AddAdmin.admin_reset)
-async def admin_reset(message: Message, state: FSMContext):
-    log_event(message)
-    rm_admin_id = Validators.lab_number_validate(message.text)
-    
-    if not rm_admin_id:
-       await message.relpy("Неверный формат ID!\nПопробуйте еще раз")
-       return
+
+
+@router.callback_query(F.data.startswith("userid_"))
+async def admin_reset(callback: CallbackQuery, bot: Bot):
+    log_event(callback.message)
+    rm_admin_id = int(callback.data.split("_")[1])
+    print(rm_admin_id)
+    await callback.answer("Удаление админа...")
    
     if rm_admin_id not in ADMINS:
-        await message.reply("❌ Данный пользователь не является админом!")
+        await callback.message.reply("❌ Данный пользователь не является админом!")
    
     ADMINS.remove(rm_admin_id)
     save_admins(ADMINS)
-    log_event(message, "УДАЛЕН АДМИН")
-    await message.answer(f"✅ Пользователь {rm_admin_id} удалён из админов.")
-    await state.clear()
+    log_event(callback.message, "УДАЛЕН АДМИН")
+    user_info = await get_user_info(bot, [rm_admin_id])
+    user_id, name, username = user_info[0]
+    # добавить имя удаляемому админ
+    await callback.message.answer(f"✅ Пользователь {name if name else user_id}({username if username else user_id}) удалён из админов.")
+    
+    
     
     
 @router.message(Command("admins"))
@@ -637,6 +645,7 @@ async def show_admins(message: Message, bot: Bot):
     await message.answer(f"📌 Админы:\n{admins_list}")
     
     
+    
 @router.message(Command("admin"))
 async def admins_approve(message: Message):
     log_event(message)
@@ -649,7 +658,7 @@ async def admins_approve(message: Message):
     
     
 # добавить кнопки с удалением админов, добавить о них больше информации
-# также баг при удалении, если не совпал номер лабы, то сообщение об удалении все равно пишется
+# добавить кнопку отмена
 
 
 #     from datetime import datetime
