@@ -4,6 +4,7 @@ from config import TG_TOKEN
 from app.handlers import router
 import logging
 from app.database.models import async_main
+from app.middleware import TypingMiddleware
 
 
 async def main():
@@ -11,6 +12,9 @@ async def main():
     bot = Bot(token=TG_TOKEN)
     dp = Dispatcher()
     dp.include_router(router)
+    
+    dp.message.middleware(TypingMiddleware())
+    
     await dp.start_polling(bot)
     
 if __name__ == "__main__":

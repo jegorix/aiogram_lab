@@ -681,6 +681,7 @@ async def admins_approve(message: Message):
     
 # добавить кнопку отмена
 # добавить информацию о существующих командах /add_admin и так далее
+# добавить анимацию печатания текста через middleware
 
 
 #     from datetime import datetime
