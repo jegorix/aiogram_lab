@@ -44,7 +44,8 @@ delete_student_method = InlineKeyboardMarkup(inline_keyboard=[
 
 async def inline_admins(bot: Bot):
     keyboard = InlineKeyboardBuilder()
-    admins_info = await get_user_info(bot, list(ADMINS))
+    current_admin = load_admins()
+    admins_info = await get_user_info(bot, list(current_admin))
     
     for user_id, firstname, username in admins_info:
         keyboard.add(InlineKeyboardButton(text=f"{firstname}({username})" if firstname else user_id if username else user_id,

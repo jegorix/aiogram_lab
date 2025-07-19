@@ -627,12 +627,14 @@ async def admin_reset(callback: CallbackQuery, bot: Bot):
 @router.message(Command("admins"))
 async def show_admins(message: Message, bot: Bot):
     log_event(message)
-    if not ADMINS:
+    
+    current_admins = load_admins()
+    
+    if not current_admins:
         await message.answer("Список админов пуст.")
         return
     
-    # admins_list = "\n".join(f"• {admin_id}" for admin_id in ADMINS)
-    admins_info = await get_user_info(bot, list(ADMINS))
+    admins_info = await get_user_info(bot, list(current_admins))
     if not admins_info:
         await message.answer("Не удалось получить информацию об админах.")
         return
@@ -649,7 +651,8 @@ async def show_admins(message: Message, bot: Bot):
 @router.message(Command("admin"))
 async def admins_approve(message: Message):
     log_event(message)
-    if int(message.from_user.id) in ADMINS:
+    current_admins = load_admins()
+    if int(message.from_user.id) in current_admins:
         await message.answer("✅ Вы являетесь админом!")
         return
     await message.answer("❌ Вы не являетесь админом!")
@@ -659,6 +662,7 @@ async def admins_approve(message: Message):
     
 # добавить кнопки с удалением админов, добавить о них больше информации
 # добавить кнопку отмена
+# добавить информацию о существующих командах /add_admin и так далее
 
 
 #     from datetime import datetime
@@ -669,4 +673,5 @@ async def admins_approve(message: Message):
     
 
     # await rq.add_student()
+    
     
