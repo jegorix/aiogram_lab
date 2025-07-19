@@ -56,6 +56,23 @@ class LabNumber(StatesGroup):
 class UserData(StatesGroup):
     search_param = State()
     user_credentials = State()
+    
+    
+    
+    
+    
+    
+    
+    # CANCEL IMPLEMENTATION
+@router.message(F.text.startswith("Отмена"))
+async def cancel(message: Message, state: FSMContext):
+    await state.clear()
+    await message.answer(
+        "Действие отменено✅",
+        )    
+    return
+    
+    
 
         
 
@@ -658,9 +675,10 @@ async def admins_approve(message: Message):
     await message.answer("❌ Вы не являетесь админом!")
     
     
+
     
     
-# добавить кнопки с удалением админов, добавить о них больше информации
+    
 # добавить кнопку отмена
 # добавить информацию о существующих командах /add_admin и так далее
 
