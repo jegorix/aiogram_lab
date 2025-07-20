@@ -18,9 +18,8 @@ router = Router()
 
 # HANDLE COMMAND START
 @router.message(CommandStart())
-async def cmd_start(message: Message, state: FSMContext):
+async def cmd_start(message: Message):
     log_event(message, "/start")
-    state.clear()
     welcome_text = """
      <b>    Добро пожаловать в бота для очереди лаб!👋</b>
      
@@ -31,10 +30,38 @@ async def cmd_start(message: Message, state: FSMContext):
     1. Встать в очередь
     2. Показать текущую очередь
     3. Покинуть очередь
+    
+    Для дополнительных справок
+    используйте команду <b>/help</b>
 
     Первый записавшийся сдаёт первым!🤓
     """
     await message.answer(welcome_text, parse_mode="HTML", reply_markup=kb.action_choose)
+    
+    
+@router.message(Command("help"))
+async def cmd_help(message: Message):
+    help_text = """
+    <b>📚 Список доступных команд:</b>
+
+    <b>Для всех пользователей:</b>
+    /start - Начать работу с ботом
+    /delete - Удалить несколько записей
+    /find - Найти записи по параметру
+
+    <b>Для администраторов:</b>
+    /admin - Проверка на админа
+    /admins - Список админов
+    /add_admin- Добавить админа
+    /del_admin - Удалить админа
+    
+     <b>Дополнительно:</b>
+     /about - информация о создателе
+     
+    <i>Вы также можете использовать кнопки меню</i>
+    """
+  
+    await message.answer(help_text, parse_mode="HTML")
     
     
     
@@ -73,8 +100,44 @@ async def cancel(message: Message, state: FSMContext):
     return
     
     
+@router.message(Command("about"))
+async def about(message: Message, bot: Bot):
+    sticker_id = "CAACAgIAAxkBAAIGVWh8LR9YcoPVjBgqQ1008Qub7c8GAALwZgACFJJoSg5uXuOo5IbFNgQ"
+    
+    about_text = """
+    
+📂 <b>Previewk</b>:
+- Hello, I'm the <b>founder & developer</b> of this project.
+- Username: @novac_jr
 
-        
+🔧 <b>Tech Stack</b>:
+- Built with 🐍 Python using <b>Aiogram</b> framework
+- Deployed on <b>Not yet</b> 
+- Database: <b>SQLite/PostgreSQL</b>
+
+💻 <b>My GitHub</b>: 
+<a href="https://github.com/jegorix">github.com/jegorix</a>
+
+📚 <b>Features</b>:
+- Queue management system
+- Admin controls
+- Real-time updates
+
+🚀 The bot is constantly evolving!
+    """
+    
+    await message.answer(about_text, parse_mode="HTML", disable_web_page_preview=True)
+    
+    await bot.send_sticker(
+        chat_id=message.chat.id,
+        sticker = sticker_id
+    )
+
+
+# @router.message(F.sticker)
+# async def get_sticker_id(message: Message):
+#     sticker_id = message.sticker.file_id
+#     await message.answer(f"Sticker id: {sticker_id}")
 
 
 
@@ -607,7 +670,7 @@ async def admin_set(message: Message, state: FSMContext, bot: Bot):
         
         
         #DELETE ADMIN
-@router.message(Command("remove_admin"))
+@router.message(Command("del_admin"))
 async def remove_admin(message: Message, bot: Bot):
     log_event(message)
     is_admin = message.from_user.id
