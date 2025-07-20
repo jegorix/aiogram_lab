@@ -429,6 +429,7 @@ class HandleDelete(StatesGroup):
     lab = State()    
     is_delete_all = State()
     is_admin = State()
+    current_user_id = State()
     
     
     
@@ -444,7 +445,8 @@ async def delete_from_queue(message: Message, state: FSMContext):
         return
     
     await state.clear()
-    await state.update_data(current_user_id=current_user[0].user_tg_id)
+    await state.update_data(current_user_id=current_user[0].user_tg_id,
+                            is_delete_all=False)
     
     await message.answer("Выберите ключевой параметр удаления", reply_markup=kb.delete_student_method)
     
@@ -454,6 +456,7 @@ async def handle_deleting(callback: CallbackQuery, state: FSMContext):
     log_event(callback)
     await callback.answer("Обработка запроса...")
     param = callback.data.split('-')[1]
+    param = "user_tg_id" if param == "id" else param
     await state.update_data(search_param=param)
     
     param = "фамилию" if param == "surname" else param
@@ -469,8 +472,9 @@ async def handle_credentials(message: Message, state: FSMContext):
     param = data["search_param"]
     value = message.text
     current_user_id = data.get("current_user_id")
+    is_admin = data.get("is_admin", False)
 
-    if param == "id":
+    if param == "user_tg_id":
         id = Validators.lab_number_validate(value)
         if not id:
             await message.reply("Неверный формат telegram id. Попробуйте еще раз!")
@@ -482,8 +486,13 @@ async def handle_credentials(message: Message, state: FSMContext):
             return
         
         value = int(value)
-        await state.update_data(user_credentials=value)
-    
+        if not is_admin and value != current_user_id:
+            await message.answer("❌ У вас нет права удалять записи других пользователей")
+            await state.clear()
+            return
+
+        await state.update_data(user_credentials=value) 
+
     else:
         await state.update_data(user_credentials=value)
         
@@ -497,16 +506,18 @@ async def handle_credentials(message: Message, state: FSMContext):
             await state.clear()
             return
         
-        if any(s.user_tg_id != current_user_id for s in students):
-            await message.answer("❌ Ваших записей нет в очереди!\nУ вас нет права удалять пользователей")
-            await state.clear()
-            return
+        if not is_admin: 
+            if any(s.user_tg_id != current_user_id for s in students):
+                await message.answer("❌ Ваших записей нет в очереди!\nУ вас нет права удалять пользователей\nHERE")
+                await state.clear()
+                return
         
-        deleted_count = await rq.delete_student(data=value, delete_all=True, param=param)
+        deleted_count = await rq.delete_student(**{param: value}, delete_all=True)
+        
         log_event(message, f"Удалено {deleted_count} записей из очереди")
         await state.clear()
         await message.answer(
-        f"✅ Удалено записей: {deleted_count} по параметру {param}: {value}" if deleted_count > 0
+        f"✅ Удалено записей: {deleted_count}\nпо параметру {param}: {value}" if deleted_count > 0
         else "❌ Записи не найдены"
         ) 
         return 
@@ -527,8 +538,8 @@ async def get_lab_num(message: Message, state: FSMContext):
     
     data = await state.get_data()
     param = data["search_param"]
-    delete_user_data = data["user_credentials"]
-    lab_number = message.text
+    delete_user_data = data.get("user_credentials")
+    lab_number = int(message.text)
     
     is_admin = message.from_user.id in ADMINS
     
@@ -619,11 +630,16 @@ async def cmd_delete(message: Message, state: FSMContext):
         await message.answer("❌ Ваших записей нет в очереди!\nУ вас нет права удалять пользователей")
         await state.clear()
         return
+    
+    
+   current_user_id = current_user[0].user_tg_id
        
    
    await state.clear()
    await state.update_data(is_delete_all=True,
-                           is_admin=is_admin)
+                           is_admin=is_admin,
+                           current_user_id=current_user_id
+                           )
    
    text = (
         "Выберите параметр для удаления ВСЕХ записей\n"
@@ -632,6 +648,11 @@ async def cmd_delete(message: Message, state: FSMContext):
     )
    
    await message.answer(text, reply_markup=kb.delete_student_method)
+   
+   
+   
+   
+   
 
 class AddAdmin(StatesGroup):
     admin_set = State()

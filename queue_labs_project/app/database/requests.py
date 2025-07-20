@@ -1,9 +1,11 @@
-from sqlalchemy import select, asc, desc, delete
+from sqlalchemy import select, asc, desc, delete, and_
 from sqlalchemy.ext.asyncio import AsyncSession
 from .models import Student, async_session
 from datetime import datetime, timezone, timedelta
+import asyncio
 
 MOSCOW_TZ = timezone(timedelta(hours=3))
+db_write_lock = asyncio.Lock()
 
 async def add_student(
     user_tg_id: int,
@@ -95,67 +97,48 @@ async def delete_student(
     username: str | None = None,
     surname: str | None = None,
     delete_all: bool = False,
-    param: str | bool = False,
-    data: str | bool = False
+    **kwargs
+    # param: str | bool = False,
+    # data: str | bool = False
 
 ) -> int:
-    async with async_session() as session:
-        query = select(Student)
-        
-        if data:
-            if param == "user_tg_id":
-                user_tg_id = int(data) if isinstance(data, str) and data.isdigit() else data
+    async with db_write_lock:
+        async with async_session() as session:
+            
+            conditions = []
+            if lab_number:
+                conditions.append(Student.lab_number == lab_number)
+            
+            if user_tg_id:
+                conditions.append(Student.user_tg_id == user_tg_id)
                 
-            elif param == "surname":
-                surname = data
+            if surname:
+                conditions.append(Student.name_fio.startswith(surname))
                 
-            elif param == "username":
-                username = data
-        
-        
-        conditions = []
-        if lab_number:
-            conditions.append(Student.lab_number == lab_number)
-        
-        if user_tg_id:
-            conditions.append(Student.user_tg_id == user_tg_id)
+            if username:
+                conditions.append(Student.username == username)
+                
+            for key, value in kwargs.items():
+                if hasattr(Student, key):
+                    conditions.append(getattr(Student, key) == value)
             
-        if surname:
-            conditions.append(Student.name_fio.startswith(surname))
+            if not conditions:
+                return 0
             
-        if username:
-            conditions.append(Student.username == username)
-            
-        if conditions:
-            query = query.where(*conditions)
-        
-        query = query.order_by(Student.created_at.asc())
-        
-        result = await session.execute(query)
-        students = result.scalars().all()
-        
-        if not students:
-            return 0
-        
-        if not delete_all:
-            await session.delete(students[0])
+            stmt = delete(Student).where(and_(*conditions))
+            result = await session.execute(stmt)
             await session.commit()
-            return 1
-        else:
-            for student in students:
-                await session.delete(student)
-                
-            await session.commit()
-            return len(students)
+            return result.rowcount
         
         
 async def delete_students_by_id(user_ids: list[int], lab_number: int) -> int:
-    async with async_session() as session:
-        result = await session.execute(
-            delete(Student).where(
-                Student.user_tg_id.in_(user_ids),
-                Student.lab_number == lab_number
+    async with db_write_lock:
+        async with async_session() as session:
+            result = await session.execute(
+                delete(Student).where(
+                    Student.user_tg_id.in_(user_ids),
+                    Student.lab_number == lab_number
+                )
             )
-        )
-        await session.commit()
-        return result.rowcount
+            await session.commit()
+            return result.rowcount
