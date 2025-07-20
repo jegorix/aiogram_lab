@@ -1,6 +1,6 @@
 from aiogram import Bot 
 
-async def get_user_info(bot: Bot, users_id: list[int]) -> list[(str, str)] | list:
+async def get_user_info(bot: Bot, users_id: list[int]) -> list:
     names = []
     try:
         for user_id in users_id:

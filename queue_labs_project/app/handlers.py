@@ -41,6 +41,7 @@ async def cmd_start(message: Message):
     
 @router.message(Command("help"))
 async def cmd_help(message: Message):
+    log_event(message)
     help_text = """
     <b>📚 Список доступных команд:</b>
 
@@ -93,6 +94,7 @@ class UserData(StatesGroup):
     # CANCEL IMPLEMENTATION
 @router.message(F.text.startswith("Отмена"))
 async def cancel(message: Message, state: FSMContext):
+    log_event(message)
     await state.clear()
     await message.answer(
         "Действие отменено✅",
@@ -102,6 +104,7 @@ async def cancel(message: Message, state: FSMContext):
     
 @router.message(Command("about"))
 async def about(message: Message, bot: Bot):
+    log_event(message, "/about")
     sticker_id = "CAACAgIAAxkBAAIGVWh8LR9YcoPVjBgqQ1008Qub7c8GAALwZgACFJJoSg5uXuOo5IbFNgQ"
     
     about_text = """
