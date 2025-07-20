@@ -285,24 +285,50 @@ async def show_menu(message: Message):
     
     
     
-async def viewing_message(callback: CallbackQuery | Message, students: list[Student], responce: list[str]) -> list[str]:
-    await callback.answer("Загрузка очереди...")
-    log_event(callback)
+    
+async def viewing_message(target: CallbackQuery | Message,
+                          students: list[Student],
+                          title: str,
+                          chunk_size: int = 15
+                          ) -> None:
+    
+    if isinstance(target, CallbackQuery):
+        message_obj = target.message
+        await target.answer("Загрузка очереди...")
+    else:
+        message_obj = target
+    
+    
+    log_event(target)
+    
     if not students:
-        await callback.message.answer("Очередь пуста!")
-        return responce
+        await message_obj.answer("Очередь пуста!")
+        return
     
-    for idx, student in enumerate(students, start=1):
-        time_str = student.created_at.strftime('%d.%m в %H:%M')
-        responce.append(
-            f"{idx}. {student.name_fio} - ({student.username})\n"
-            f"Лабораторная работа №{student.lab_number}\n"
-            f"Подгруппа-{student.sub_group}\n"
-            f"Ссылка на github:\n{student.github_link}\n"
-            f"Добавлен {time_str}\n"
+    total_count = 0
+    for i in range(0, len(students), chunk_size):
+        chunk = students[i:i + chunk_size]
+        message_lines = [title]
+    
+        for idx, student in enumerate(chunk, start=total_count + 1):
+            time_str = student.created_at.strftime('%d.%m в %H:%M')
+            message_lines.append(
+                f"{idx}. {student.name_fio} - ({student.username})\n"
+                f"Лабораторная работа №<b>{student.lab_number}</b>\n"
+                f"Подгруппа-{student.sub_group}\n"
+                f"Ссылка на github:\n{student.github_link}\n"
+                f"Добавлен {time_str}\n"
+            )
+        
+        total_count += len(chunk)
+        
+        await message_obj.answer(
+            "\n".join(message_lines),
+            parse_mode="HTML",
+            disable_web_page_preview=True
         )
-    
-    return responce
+    if isinstance(target, CallbackQuery):
+        await target.answer(f"Загружено {total_count} записей")
     
     
     
@@ -310,14 +336,17 @@ async def viewing_message(callback: CallbackQuery | Message, students: list[Stud
 async def quick_show(callback: CallbackQuery):
     log_event(callback)
     students = await rq.get_students_sorted(sort_by_time=True)
+    response = "<b>Текущая очередь (отсортирована по времени добавления)</b>\n"
     
-    responce = ["<b>Текущая очередь отсортированная по времени добавления</b>\n"]
+    await viewing_message(
+        callback,
+        students,
+        response
+    )
 
-    updated_responce = await viewing_message(callback, students, responce)
     
-    if updated_responce:
-        await callback.message.answer("\n\n".join(updated_responce), parse_mode="HTML", disable_web_page_preview=True)
-
+        
+    
 
 
 @router.callback_query(F.data.startswith("sub_group-"))
@@ -325,11 +354,10 @@ async def sub_group_show(callback: CallbackQuery):
     log_event(callback)
     group_number = int(callback.data.split("-")[1])
     students = await rq.get_students_sorted(sub_group=group_number)
-    responce = [f"<b>Текущая очередь отсортированная по номеру подгруппы\n\nПодгруппа-{group_number}</b>\n"]
-    updated_responce = await viewing_message(callback, students, responce)
+    response = f"<b>Текущая очередь отсортированная по номеру подгруппы\n\nПодгруппа-{group_number}</b>\n"
     
-    if updated_responce:
-        await callback.message.answer("\n\n".join(updated_responce), parse_mode="HTML", disable_web_page_preview=True)
+    await viewing_message(callback, students, response)
+
 
 
 @router.callback_query(F.data == "lab_number_show")
@@ -350,12 +378,9 @@ async def get_lab_number(message: Message, state: FSMContext):
     await state.clear()
     
     students = await rq.get_students_sorted(lab_number=number)
-    responce = [f"<b>Текущая очередь отсортированная по номеру лабы\nЛаба №{number}</b>\n"]
+    response = f"<b>Текущая очередь отсортированная по номеру лабы\nЛаба №{number}</b>\n"
     
-    updated_responce = await viewing_message(message, students, responce)
-    
-    if updated_responce:
-        await message.answer("\n\n".join(updated_responce), parse_mode="HTML", disable_web_page_preview=True)
+    await viewing_message(message, students, response)
     
     
     
