@@ -12,7 +12,7 @@ completion = client.chat.completions.create(
   messages=[
     {
       "role": "user",
-      "content": "What is the meaning of life?"
+      "content": "Who is Hans Zimmer?"
     }
   ]
 )
